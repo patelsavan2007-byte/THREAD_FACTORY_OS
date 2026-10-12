@@ -1,0 +1,15 @@
+# Binaries & Object Files
+*.exe
+*.o
+*.obj
+*.out
+
+# Python cache
+__pycache__/
+*.py[cod]
+
+# Editor / OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Thread Factory — OS Concurrency Simulator</title>
+    <meta name="description" content="Interactive Operating Systems simulation showing concurrent job processing using POSIX threads (pthreads), mutex locks, and condition variables in C.">
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Top Navigation / Header -->
+        <header class="app-header">
+            <div class="header-brand">
+                <div class="brand-icon">
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M2 20a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8l-7 5V8l-7 5V4a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/>
+                        <path d="M17 18h1"/>
+                        <path d="M12 18h1"/>
+                        <path d="M7 18h1"/>
+                    </svg>
+                </div>
+                <div class="brand-text">
+                    <h1>Thread Factory</h1>
+                    <p class="tagline">Operating Systems Mini Simulation &bull; POSIX Threads (pthreads)</p>
+                </div>
+            </div>
+
+            <div class="header-status-group">
+                <div class="status-badge" id="backendStatus">
+                    <span class="status-dot connected"></span>
+                    <span class="status-label">C Backend Online</span>
+                </div>
+                <div class="status-badge state-badge" id="simStateBadge">
+                    <span class="sim-state-text">READY</span>
+                </div>
+                <button class="btn btn-secondary btn-sm" id="btnOpenDocs" title="View OS Multithreading Concepts">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+                    <span>OS Concepts</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- KPI Dashboard Cards -->
+        <section class="dashboard-kpis">
+            <div class="kpi-card">
+                <div class="kpi-icon icon-blue">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="8" height="4" x="8" y="2" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/></svg>
+                </div>
+                <div class="kpi-info">
+                    <span class="kpi-label">Total Jobs</span>
+                    <span class="kpi-value" id="kpiTotalJobs">0</span>
+                    <span class="kpi-subtext" id="kpiTotalJobsSub">Submitted to factory</span>
+                </div>
+            </div>
+
+            <div class="kpi-card">
+                <div class="kpi-icon icon-amber">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4"/><path d="m16.2 7.8 2.9-2.9"/><path d="M18 12h4"/><path d="m16.2 16.2 2.9 2.9"/><path d="M12 18v4"/><path d="m4.9 19.1 2.9-2.9"/><path d="M2 12h4"/><path d="m4.9 4.9 2.9 2.9"/></svg>
+                </div>
+                <div class="kpi-info">
+                    <span class="kpi-label">Pending Queue</span>
+                    <span class="kpi-value" id="kpiPendingJobs">0</span>
+                    <span class="kpi-subtext">Waiting for worker</span>
+                </div>
+            </div>
+
+            <div class="kpi-card">
+                <div class="kpi-icon icon-cyan">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                </div>
+                <div class="kpi-info">
+                    <span class="kpi-label">Active Workers</span>
+                    <span class="kpi-value"><span id="kpiActiveWorkers">0</span> / <span id="kpiTotalWorkers">4</span></span>
+                    <span class="kpi-subtext">Busy concurrent threads</span>
+                </div>
+            </div>
+
+            <div class="kpi-card">
+                <div class="kpi-icon icon-emerald">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                </div>
+                <div class="kpi-info">
+                    <span class="kpi-label">Completed Jobs</span>
+                    <span class="kpi-value" id="kpiCompletedJobs">0</span>
+                    <span class="kpi-subtext">Successfully processed</span>
+                </div>
+            </div>
+
+            <div class="kpi-card highlight-card">
+                <div class="kpi-icon icon-speedup">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                </div>
+                <div class="kpi-info">
+                    <span class="kpi-label">Concurrency Speedup</span>
+                    <span class="kpi-value speedup-highlight" id="kpiSpeedup">1.00x</span>
+                    <span class="kpi-subtext" id="kpiSpeedupDetails">Seq: 0.0s | Par: 0.0s</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- Simulation Control Bar & Job Dispatcher -->
+        <section class="control-panel-container">
+            <div class="panel-card control-card">
+                <div class="card-heading">
+                    <span class="heading-title">Simulation Controls</span>
+                    <span class="heading-badge">State Machine</span>
+                </div>
+                <div class="controls-toolbar">
+                    <button class="btn btn-primary" id="btnStart">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                        <span>Start</span>
+                    </button>
+                    <button class="btn btn-warning" id="btnPause" disabled>
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+                        <span>Pause</span>
+                    </button>
+                    <button class="btn btn-info" id="btnResume" disabled>
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                        <span>Resume</span>
+                    </button>
+                    <button class="btn btn-danger-outline" id="btnReset">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+                        <span>Reset</span>
+                    </button>
+
+                    <div class="worker-count-selector">
+                        <span class="selector-label">Worker Threads:</span>
+                        <div class="btn-group" id="workerCountGroup">
+                            <button class="btn btn-toggle" data-count="1">1</button>
+                            <button class="btn btn-toggle" data-count="2">2</button>
+                            <button class="btn btn-toggle active" data-count="4">4</button>
+                            <button class="btn btn-toggle" data-count="8">8</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Job Dispatch Form -->
+            <div class="panel-card dispatch-card">
+                <div class="card-heading">
+                    <span class="heading-title">Job Dispatcher</span>
+                    <span class="heading-badge">Producer Thread</span>
+                </div>
+                <form id="jobForm" class="job-dispatch-form">
+                    <div class="form-row">
+                        <div class="input-group flex-2">
+                            <label for="jobNameInput">Job Name</label>
+                            <input type="text" id="jobNameInput" placeholder="e.g. SMT Soldering, Quality Check" required value="Chassis Milling">
+                        </div>
+                        <div class="input-group flex-1">
+                            <label for="jobDurationInput">Duration (sec)</label>
+                            <div class="duration-input-wrapper">
+                                <input type="number" id="jobDurationInput" min="0.5" max="20" step="0.5" value="3.0" required>
+                                <span class="unit-tag">s</span>
+                            </div>
+                        </div>
+                        <div class="input-group flex-auto btn-submit-cell">
+                            <button type="submit" class="btn btn-primary" id="btnAddJob">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x2="19" y1="12" x1="5"/></svg>
+                                <span>Enqueue Job</span>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="quick-presets-row">
+                        <span class="preset-label">Quick Batches:</span>
+                        <button type="button" class="btn-chip" id="btnAddBatch4">+4 Sample Jobs</button>
+                        <button type="button" class="btn-chip" id="btnAddBatch8">+8 Heavy Batch</button>
+                        <span class="preset-duration-chips">
+                            <button type="button" class="chip-duration" data-dur="1.5">1.5s</button>
+                            <button type="button" class="chip-duration" data-dur="2.5">2.5s</button>
+                            <button type="button" class="chip-duration" data-dur="4.0">4.0s</button>
+                        </span>
+                    </div>
+                </form>
+            </div>
+        </section>
+
+        <!-- Main Factory Layout: Worker Threads Floor + Queue / Logs -->
+        <main class="factory-floor-grid">
+            <!-- Left Side: Worker Threads Cards -->
+            <section class="floor-section workers-section">
+                <div class="section-header">
+                    <div class="section-title">
+                        <h2>Factory Worker Threads</h2>
+                        <span class="section-subtext">POSIX Threads Pool (<code>pthread_create()</code>)</span>
+                    </div>
+                    <div class="pool-stats-badge">
+                        <span id="activePoolLabel">4 Active Workers</span>
+                    </div>
+                </div>
+
+                <div class="worker-cards-grid" id="workerCardsContainer">
+                    <!-- Populated dynamically via JS -->
+                </div>
+            </section>
+
+            <!-- Right Side: Job Queue & Completed History & Terminal Logs -->
+            <section class="floor-section side-section">
+                <!-- Tabs for Queue and Completed -->
+                <div class="panel-card queue-panel">
+                    <div class="tab-header">
+                        <div class="tab-buttons">
+                            <button class="tab-btn active" data-tab="tabQueue">
+                                <span>Job Queue</span>
+                                <span class="badge-pill" id="badgeQueueCount">0</span>
+                            </button>
+                            <button class="tab-btn" data-tab="tabCompleted">
+                                <span>Completed Jobs</span>
+                                <span class="badge-pill" id="badgeCompletedCount">0</span>
+                            </button>
+                        </div>
+                        <div class="tab-sync-info">
+                            <span class="sync-lock-icon">🔒 Mutex Protected</span>
+                        </div>
+                    </div>
+
+                    <!-- Queue Tab Pane -->
+                    <div class="tab-content active" id="tabQueue">
+                        <div class="table-wrapper">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>#ID</th>
+                                        <th>Job Name</th>
+                                        <th>Duration</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="queueTableBody">
+                                    <tr>
+                                        <td colspan="4" class="empty-cell">Queue is empty. Add a job above!</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Completed Tab Pane -->
+                    <div class="tab-content" id="tabCompleted">
+                        <div class="table-wrapper">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>#ID</th>
+                                        <th>Job Name</th>
+                                        <th>Duration</th>
+                                        <th>Worker</th>
+                                        <th>Time</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="completedTableBody">
+                                    <tr>
+                                        <td colspan="5" class="empty-cell">No jobs completed yet.</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Live Execution Console / Logs -->
+                <div class="panel-card logs-panel">
+                    <div class="card-heading logs-heading">
+                        <div class="heading-left">
+                            <span class="terminal-dot red"></span>
+                            <span class="terminal-dot yellow"></span>
+                            <span class="terminal-dot green"></span>
+                            <span class="heading-title" style="margin-left: 8px;">Execution Logs</span>
+                        </div>
+                        <div class="log-actions">
+                            <button class="btn btn-xs btn-outline" id="btnClearLogs">Clear</button>
+                            <label class="autoscroll-toggle">
+                                <input type="checkbox" id="chkAutoScroll" checked>
+                                <span>Auto-scroll</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="log-filter-chips">
+                        <button class="filter-chip active" data-filter="ALL">All</button>
+                        <button class="filter-chip" data-filter="MUTEX">Mutex (Locks)</button>
+                        <button class="filter-chip" data-filter="COND_VAR">Condition Var</button>
+                        <button class="filter-chip" data-filter="WORKER">Workers</button>
+                        <button class="filter-chip" data-filter="QUEUE">Queue</button>
+                    </div>
+
+                    <div class="terminal-window" id="terminalWindow">
+                        <div class="log-stream" id="logStream">
+                            <!-- Populated dynamically via JS -->
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- OS Multithreading Concept Deep Dive Modal -->
+        <div class="modal-backdrop" id="conceptsModal" style="display: none;">
+            <div class="modal-dialog">
+                <div class="modal-header">
+                    <div class="modal-title-wrap">
+                        <h3>Operating Systems: Multithreading & POSIX Threads</h3>
+                        <p class="modal-subtitle">How Thread Factory implements core OS concurrency principles</p>
+                    </div>
+                    <button class="modal-close-btn" id="btnCloseModal">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="concept-grid">
+                        <div class="concept-card">
+                            <div class="concept-title">
+                                <span class="badge-tag">1. pthread_create()</span>
+                                <h4>Worker Thread Pool</h4>
+                            </div>
+                            <p>POSIX threads (pthreads) represent independent execution contexts that share the same memory space. In this project, a pool of N worker threads is spawned at startup and kept ready in memory.</p>
+                            <pre class="code-snippet">pthread_create(&worker->tid, NULL, worker_routine, worker);</pre>
+                        </div>
+
+                        <div class="concept-card">
+                            <div class="concept-title">
+                                <span class="badge-tag">2. pthread_mutex_t</span>
+                                <h4>Mutual Exclusion (Mutex)</h4>
+                            </div>
+                            <p>The Job Queue is a shared critical section. Without a mutex, multiple threads checking <code>queue_pop()</code> simultaneously would suffer <strong>race conditions</strong> and corrupt memory. The mutex guarantees atomic queue access.</p>
+                            <pre class="code-snippet">pthread_mutex_lock(&sim_mutex);
+Job j = queue_pop(&queue);
+pthread_mutex_unlock(&sim_mutex);</pre>
+                        </div>
+
+                        <div class="concept-card">
+                            <div class="concept-title">
+                                <span class="badge-tag">3. pthread_cond_t</span>
+                                <h4>Condition Variables</h4>
+                            </div>
+                            <p>Instead of wasteful CPU spinning (busy-waiting) when the queue is empty, idle worker threads sleep using <code>pthread_cond_wait()</code>. When a new job arrives, <code>pthread_cond_signal()</code> wakes an idle worker instantly.</p>
+                            <pre class="code-snippet">pthread_cond_wait(&queue_cv, &sim_mutex); // Sleep
+pthread_cond_signal(&queue_cv);          // Wake up</pre>
+                        </div>
+
+                        <div class="concept-card">
+                            <div class="concept-title">
+                                <span class="badge-tag">4. Amdahl's Law</span>
+                                <h4>Sequential vs. Concurrent</h4>
+                            </div>
+                            <p>Sequential processing executes tasks one after another: \(T_{seq} = \sum t_i\). Concurrent processing runs independent jobs in parallel across multiple CPU cores, yielding a theoretical speedup factor: \(Speedup = \frac{T_{seq}}{T_{wall}}\).</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-primary" id="btnUnderstand">Got it, Back to Simulation</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <footer class="app-footer">
+            <p><strong>Thread Factory</strong> &bull; Operating Systems Lab Project &bull; Built with C (pthreads & Winsock) & Modern Web UI</p>
+        </footer>
+    </div>
+
+    <script src="js/app.js"></script>
+</body>
+</html>
