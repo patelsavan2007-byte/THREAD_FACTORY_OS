@@ -12,17 +12,26 @@ static void parse_json_str(const char* json, const char* key, char* out, size_t 
     char pattern[64];
     snprintf(pattern, sizeof(pattern), "\"%s\"", key);
     const char* p = strstr(json, pattern);
-    if (!p) return;
-    p += strlen(pattern);
-    while (*p == ' ' || *p == ':' || *p == '\t') p++;
-    if (*p == '\"') {
-        p++;
-        size_t idx = 0;
-        while (*p && *p != '\"' && idx < max_len - 1) {
-            out[idx++] = *p++;
-        }
-        out[idx] = '\0';
+    if (!p) {
+        /* Also try single quotes or unquoted key */
+        snprintf(pattern, sizeof(pattern), "%s", key);
+        p = strstr(json, pattern);
+        if (!p) return;
     }
+    p += strlen(pattern);
+    while (*p == ' ' || *p == ':' || *p == '\t' || *p == '\r' || *p == '\n') p++;
+    char quote = 0;
+    if (*p == '\"' || *p == '\'') {
+        quote = *p;
+        p++;
+    }
+    size_t idx = 0;
+    while (*p && idx < max_len - 1) {
+        if (quote && *p == quote) break;
+        if (!quote && (*p == ',' || *p == '}' || *p == ' ' || *p == '\r' || *p == '\n')) break;
+        out[idx++] = *p++;
+    }
+    out[idx] = '\0';
 }
 
 /* Helper to parse JSON numeric fields */
@@ -30,9 +39,13 @@ static double parse_json_double(const char* json, const char* key, double def_va
     char pattern[64];
     snprintf(pattern, sizeof(pattern), "\"%s\"", key);
     const char* p = strstr(json, pattern);
-    if (!p) return def_val;
+    if (!p) {
+        snprintf(pattern, sizeof(pattern), "%s", key);
+        p = strstr(json, pattern);
+        if (!p) return def_val;
+    }
     p += strlen(pattern);
-    while (*p == ' ' || *p == ':' || *p == '\t' || *p == '\"') p++;
+    while (*p == ' ' || *p == ':' || *p == '\t' || *p == '\"' || *p == '\'' || *p == '\r' || *p == '\n') p++;
     char* endptr = NULL;
     double v = strtod(p, &endptr);
     return (endptr == p) ? def_val : v;
@@ -255,7 +268,7 @@ static void handle_static_file(SOCKET client_sock, const char* path, const char*
 
 /* Handle HTTP Client Request */
 static void process_client(SOCKET client_sock) {
-    char req_buf[4096];
+    char req_buf[8192];
     int bytes_read = recv(client_sock, req_buf, sizeof(req_buf) - 1, 0);
     if (bytes_read <= 0) {
         closesocket(client_sock);
@@ -269,11 +282,32 @@ static void process_client(SOCKET client_sock) {
     sscanf(req_buf, "%15s %255s", method, path);
 
     /* Locate body if POST */
-    const char* body = strstr(req_buf, "\r\n\r\n");
+    char* body = strstr(req_buf, "\r\n\r\n");
     if (body) {
         body += 4;
     } else {
-        body = "";
+        body = strstr(req_buf, "\n\n");
+        if (body) body += 2;
+        else body = req_buf + bytes_read;
+    }
+
+    if (strcmp(method, "POST") == 0) {
+        int content_length = 0;
+        const char* cl_pos = strstr(req_buf, "Content-Length:");
+        if (!cl_pos) cl_pos = strstr(req_buf, "content-length:");
+        if (cl_pos) {
+            content_length = atoi(cl_pos + 15);
+        }
+
+        int body_offset = (int)(body - req_buf);
+        int current_body_len = bytes_read - body_offset;
+        while (current_body_len < content_length && bytes_read < (int)sizeof(req_buf) - 1) {
+            int more = recv(client_sock, req_buf + bytes_read, (int)sizeof(req_buf) - 1 - bytes_read, 0);
+            if (more <= 0) break;
+            bytes_read += more;
+            req_buf[bytes_read] = '\0';
+            current_body_len = bytes_read - body_offset;
+        }
     }
 
     if (strcmp(method, "OPTIONS") == 0) {
@@ -339,6 +373,11 @@ static void process_client(SOCKET client_sock) {
         send_response(client_sock, 405, "Method Not Allowed", "text/plain", "Method Not Allowed", 18);
     }
 
+#ifdef _WIN32
+    shutdown(client_sock, SD_SEND);
+#else
+    shutdown(client_sock, SHUT_WR);
+#endif
     closesocket(client_sock);
 }
 
